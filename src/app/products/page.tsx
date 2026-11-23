@@ -7,10 +7,8 @@ import {
   Edit, 
   Trash2, 
   Package, 
-  AlertTriangle,
-  CheckCircle,
-  X,
-  Layers
+  FolderPlus,
+  X
 } from 'lucide-react';
 
 interface Product {
@@ -32,7 +30,7 @@ export default function ProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Modal State
+  // Product Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
@@ -44,9 +42,16 @@ export default function ProductsPage() {
     minStock: '5',
     categoryId: '',
   });
+
+  // Category Modal State
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [categoryName, setCategoryName] = useState('');
+  const [categoryDesc, setCategoryDesc] = useState('');
+  const [submittingCategory, setSubmittingCategory] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
 
-  // Pagination state (meets assignment requirement for Search and Pagination)
+  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
@@ -145,6 +150,31 @@ export default function ProductsPage() {
     }
   };
 
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!categoryName) return;
+    setSubmittingCategory(true);
+
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: categoryName, description: categoryDesc }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create category');
+
+      setCategoryName('');
+      setCategoryDesc('');
+      setIsCategoryModalOpen(false);
+      fetchProducts(); // Refresh categories
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setSubmittingCategory(false);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this product?')) return;
     try {
@@ -173,13 +203,22 @@ export default function ProductsPage() {
             Create, edit, and track catalog items and inventory levels
           </p>
         </div>
-        <button
-          onClick={openAddModal}
-          className="inline-flex items-center justify-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-600/20 transition-all text-sm cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add New Product</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsCategoryModalOpen(true)}
+            className="inline-flex items-center justify-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium px-4 py-2.5 rounded-xl shadow transition-all text-sm cursor-pointer"
+          >
+            <FolderPlus className="w-4 h-4 text-emerald-400" />
+            <span>Add Category</span>
+          </button>
+          <button
+            onClick={openAddModal}
+            className="inline-flex items-center justify-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-600/20 transition-all text-sm cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add New Product</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -200,7 +239,7 @@ export default function ProductsPage() {
           onChange={(e) => setSelectedCategory(e.target.value)}
           className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
         >
-          <option value="">All Categories</option>
+          <option value="">All Categories ({categories.length})</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -209,7 +248,7 @@ export default function ProductsPage() {
         </select>
       </div>
 
-      {/* Products Table (Meets List + Search + Pagination requirement) */}
+      {/* Products Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -361,9 +400,18 @@ export default function ProductsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Category *
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Category *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsCategoryModalOpen(true)}
+                      className="text-[11px] text-emerald-400 hover:underline cursor-pointer"
+                    >
+                      + New
+                    </button>
+                  </div>
                   <select
                     value={formData.categoryId}
                     onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
@@ -464,6 +512,72 @@ export default function ProductsPage() {
                   className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
                 >
                   {submitting ? 'Saving...' : editingProduct ? 'Update Product' : 'Create Product'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Category Creation Modal */}
+      {isCategoryModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <FolderPlus className="w-5 h-5 text-emerald-400" />
+                <span>Add New Category</span>
+              </h3>
+              <button
+                onClick={() => setIsCategoryModalOpen(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCategory} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Category Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={categoryName}
+                  onChange={(e) => setCategoryName(e.target.value)}
+                  placeholder="e.g. Desserts, Coffee, Electronics"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Description (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={categoryDesc}
+                  onChange={(e) => setCategoryDesc(e.target.value)}
+                  placeholder="Short description of this category"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryModalOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-300 hover:bg-slate-800 text-sm font-medium transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingCategory}
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
+                >
+                  {submittingCategory ? 'Creating...' : 'Save Category'}
                 </button>
               </div>
             </form>
